@@ -1,0 +1,6 @@
+{
+  "name": "工程進度與甘特圖管制系統",
+  "description": "專業工程進度管理與管制節點甘特圖系統，支援分項工程分解(WBS)、里程碑節點、預定與實際進度對比、相依關係連線及落後預警。",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

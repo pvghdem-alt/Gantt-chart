@@ -1,0 +1,54 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Global Safety Net: Default Deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Helper functions
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isValidProject(data) {
+      return data.id is string && data.id.size() <= 128 &&
+             data.name is string && data.name.size() > 0 && data.name.size() <= 200 &&
+             data.code is string && data.code.size() > 0 && data.code.size() <= 60 &&
+             data.startDate is string && data.startDate.size() <= 30 &&
+             data.targetEndDate is string && data.targetEndDate.size() <= 30 &&
+             data.phases is list && data.phases.size() <= 50 &&
+             data.tasks is list && data.tasks.size() <= 500;
+    }
+
+    // Connection test doc (used by testConnection in SDK setup)
+    match /test/connection {
+      allow read: if true;
+    }
+
+    // Engineering Projects collection
+    match /projects/{projectId} {
+      // Allow reading projects for collaborative schedule monitoring
+      allow get: if isValidId(projectId);
+      allow list: if true;
+
+      // Allow creating project with validated schema
+      allow create: if isValidId(projectId) && isValidProject(incoming());
+
+      // Allow updating project with validated schema
+      allow update: if isValidId(projectId) && isValidProject(incoming());
+
+      // Allow deleting project
+      allow delete: if isValidId(projectId);
+    }
+  }
+}
