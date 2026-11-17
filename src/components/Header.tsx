@@ -55,10 +55,26 @@ export const Header: React.FC<HeaderProps> = ({
 }) => {
   const [isProjectDropdownOpen, setIsProjectDropdownOpen] = useState(false);
 
+  const navItems: {
+    id: ActiveView;
+    label: string;
+    icon: React.ComponentType<{ className?: string }>;
+    iconColor: string;
+  }[] = [
+    { id: 'portfolio', label: '工程總覽', icon: FolderKanban, iconColor: 'text-slate-700' },
+    { id: 'gantt', label: '甘特圖排程', icon: Calendar, iconColor: 'text-blue-600' },
+    { id: 'milestones', label: '管制節點中心', icon: CheckCircle2, iconColor: 'text-amber-600' },
+    { id: 'table', label: '工項總表 (WBS)', icon: Layers, iconColor: 'text-blue-600' },
+    { id: 'analytics', label: '進度與S曲線', icon: BarChart3, iconColor: 'text-emerald-600' },
+    { id: 'workforce', label: '每日出工統計', icon: Users, iconColor: 'text-indigo-600' },
+    { id: 'tutorial', label: '甘特圖教學', icon: BookOpen, iconColor: 'text-sky-600' },
+  ];
+
   return (
     <header className="no-print bg-white border-b border-slate-200 sticky top-0 z-30 shadow-xs">
-      <div className="flex items-center justify-between gap-6 px-6 py-3 max-w-[1720px] mx-auto">
-        {/* Zone 1: Brand title & Multi-Project Switcher Dropdown */}
+      {/* Row 1: Brand & Project Switcher (Left) + Tools, Primary CTA & Account (Right) */}
+      <div className="flex flex-wrap items-center justify-between gap-3 px-4 sm:px-6 py-2.5 max-w-[1720px] mx-auto">
+        {/* Brand title & Multi-Project Switcher Dropdown */}
         <div className="flex items-center gap-3 whitespace-nowrap shrink-0">
           <div className="w-8 h-8 rounded-lg bg-slate-900 flex items-center justify-center text-white font-bold text-base shadow-xs">
             <span className="tracking-tighter">PM</span>
@@ -70,7 +86,7 @@ export const Header: React.FC<HeaderProps> = ({
               onClick={() => setIsProjectDropdownOpen((v) => !v)}
               className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg border border-slate-200 hover:border-slate-300 hover:bg-slate-50 transition-colors text-left"
             >
-              <div className="max-w-[200px] sm:max-w-[280px]">
+              <div className="max-w-[210px] sm:max-w-[340px]">
                 <div className="text-2xs font-mono text-slate-400 leading-none">
                   工程專案 · {projects.length} 個管制中
                 </div>
@@ -164,99 +180,12 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
         </div>
 
-        {/* Zone 2: clean single-line nav links */}
-        <nav className="flex items-center gap-1 p-1 bg-slate-100 rounded-lg text-xs font-medium text-slate-600 overflow-x-auto">
-          <button
-            onClick={() => onViewChange('portfolio')}
-            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md transition-all whitespace-nowrap shrink-0 ${
-              activeView === 'portfolio'
-                ? 'bg-white text-slate-900 shadow-2xs font-semibold'
-                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
-            }`}
-          >
-            <FolderKanban className="w-3.5 h-3.5 text-slate-700" />
-            <span>工程總覽</span>
-          </button>
-
-          <button
-            onClick={() => onViewChange('gantt')}
-            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md transition-all whitespace-nowrap shrink-0 ${
-              activeView === 'gantt'
-                ? 'bg-white text-slate-900 shadow-2xs font-semibold'
-                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
-            }`}
-          >
-            <Calendar className="w-3.5 h-3.5 text-slate-700" />
-            <span>甘特圖排程</span>
-          </button>
-
-          <button
-            onClick={() => onViewChange('milestones')}
-            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md transition-all whitespace-nowrap shrink-0 ${
-              activeView === 'milestones'
-                ? 'bg-white text-slate-900 shadow-2xs font-semibold'
-                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
-            }`}
-          >
-            <CheckCircle2 className="w-3.5 h-3.5 text-amber-600" />
-            <span>管制節點中心</span>
-          </button>
-
-          <button
-            onClick={() => onViewChange('table')}
-            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md transition-all whitespace-nowrap shrink-0 ${
-              activeView === 'table'
-                ? 'bg-white text-slate-900 shadow-2xs font-semibold'
-                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
-            }`}
-          >
-            <Layers className="w-3.5 h-3.5 text-blue-600" />
-            <span>工項總表 (WBS)</span>
-          </button>
-
-          <button
-            onClick={() => onViewChange('analytics')}
-            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md transition-all whitespace-nowrap shrink-0 ${
-              activeView === 'analytics'
-                ? 'bg-white text-slate-900 shadow-2xs font-semibold'
-                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
-            }`}
-          >
-            <BarChart3 className="w-3.5 h-3.5 text-emerald-600" />
-            <span>進度與S曲線</span>
-          </button>
-
-          <button
-            onClick={() => onViewChange('workforce')}
-            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md transition-all whitespace-nowrap shrink-0 ${
-              activeView === 'workforce'
-                ? 'bg-white text-slate-900 shadow-2xs font-semibold'
-                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
-            }`}
-          >
-            <Users className="w-3.5 h-3.5 text-indigo-600" />
-            <span>每日出工統計</span>
-          </button>
-
-          <button
-            onClick={() => onViewChange('tutorial')}
-            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md transition-all whitespace-nowrap shrink-0 ${
-              activeView === 'tutorial'
-                ? 'bg-white text-slate-900 shadow-2xs font-semibold'
-                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
-            }`}
-          >
-            <BookOpen className="w-3.5 h-3.5 text-sky-600" />
-            <span>甘特圖教學</span>
-          </button>
-        </nav>
-
-        {/* Zone 3: Utility buttons & 1 primary action */}
-        <div className="flex items-center gap-2 shrink-0">
+        {/* Utility buttons, primary action & account */}
+        <div className="flex items-center gap-2 shrink-0 flex-wrap">
           {/* Firebase Cloud Sync status */}
           <div
             title="Firebase Firestore 雲端資料庫已連線，資料即時同步"
-            className="hidden lg:flex items-center gap-1.5 text-2xs text-slate-500 font-mono pr-2 border-r border-slate-200"
+            className="hidden md:flex items-center gap-1.5 text-2xs text-slate-500 font-mono pr-2 border-r border-slate-200 whitespace-nowrap"
           >
             <span
               className={`w-1.5 h-1.5 rounded-full ${
@@ -311,7 +240,7 @@ export const Header: React.FC<HeaderProps> = ({
             <div className="flex items-center gap-1.5 pl-2 border-l border-slate-200">
               <span
                 title={`已授權登入帳號: ${userEmail}`}
-                className="hidden xl:inline-block text-3xs font-mono text-slate-600 bg-slate-100 px-2 py-1 rounded border border-slate-200 max-w-[150px] truncate"
+                className="hidden lg:inline-block text-3xs font-mono text-slate-600 bg-slate-100 px-2 py-1 rounded border border-slate-200 max-w-[160px] truncate"
               >
                 {userEmail}
               </span>
@@ -326,6 +255,30 @@ export const Header: React.FC<HeaderProps> = ({
             </div>
           )}
         </div>
+      </div>
+
+      {/* Row 2: Dedicated Spacious Navigation Tabs */}
+      <div className="border-t border-slate-100 bg-slate-50/70">
+        <nav className="flex items-center gap-1.5 px-4 sm:px-6 py-1.5 max-w-[1720px] mx-auto overflow-x-auto">
+          {navItems.map((item) => {
+            const Icon = item.icon;
+            const isActive = activeView === item.id;
+            return (
+              <button
+                key={item.id}
+                onClick={() => onViewChange(item.id)}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs transition-all whitespace-nowrap shrink-0 border ${
+                  isActive
+                    ? 'bg-white text-slate-900 border-slate-200 shadow-2xs font-semibold'
+                    : 'bg-transparent border-transparent text-slate-600 hover:text-slate-900 hover:bg-slate-200/50 font-medium'
+                }`}
+              >
+                <Icon className={`w-3.5 h-3.5 ${item.iconColor}`} />
+                <span>{item.label}</span>
+              </button>
+            );
+          })}
+        </nav>
       </div>
     </header>
   );

@@ -364,22 +364,31 @@ export function calculateProjectMetrics(project: Project) {
 export function generateSCurveData(project: Project) {
   if (project.tasks.length === 0) return [];
 
-  // Group by months or weeks
   const start = parseDate(project.startDate);
   const end = parseDate(project.targetEndDate);
-  
-  const intervals: { date: string; label: string; planned: number; actual: number }[] = [];
+
+  const dateSet = new Set<string>();
   const curr = new Date(start);
+  while (curr <= end) {
+    dateSet.add(formatDate(curr));
+    curr.setDate(curr.getDate() + 7);
+  }
+  dateSet.add(project.targetEndDate);
+  if (TODAY_STR >= project.startDate && TODAY_STR <= project.targetEndDate) {
+    dateSet.add(TODAY_STR);
+  }
+
+  const sortedDates = Array.from(dateSet).sort((a, b) => a.localeCompare(b));
   const sumWeights = project.tasks.reduce((sum, t) => sum + (t.weight || 0), 0) || 100;
 
-  while (curr <= end) {
-    const dStr = formatDate(curr);
-    
+  return sortedDates.map((dStr) => {
+    const parsed = parseDate(dStr);
+
     // Calculate cumulative planned at this date
     let plannedAcc = 0;
     project.tasks.forEach((t) => {
       const p = getPlannedProgress(t.startDate, t.endDate, dStr);
-      plannedAcc += p * (t.weight / sumWeights);
+      plannedAcc += p * ((t.weight || 0) / sumWeights);
     });
 
     // Calculate actual up to today
@@ -387,29 +396,25 @@ export function generateSCurveData(project: Project) {
     const isPastOrToday = dStr <= TODAY_STR;
     if (isPastOrToday) {
       project.tasks.forEach((t) => {
-        // If task finished before this date, full progress
-        if (t.endDate <= dStr) {
-          actualAcc += t.progress * (t.weight / sumWeights);
+        const wFrac = (t.weight || 0) / sumWeights;
+        if (dStr === TODAY_STR || t.endDate <= dStr) {
+          actualAcc += t.progress * wFrac;
         } else if (t.startDate <= dStr) {
-          const ratio = diffDays(t.startDate, dStr) / calculateDuration(t.startDate, t.endDate);
-          const interpolated = Math.min(t.progress, Math.max(0, t.progress * ratio));
-          actualAcc += interpolated * (t.weight / sumWeights);
+          const boundDate = TODAY_STR < t.endDate ? TODAY_STR : t.endDate;
+          const denom = Math.max(1, diffDays(t.startDate, boundDate));
+          const ratio = Math.min(1, Math.max(0, diffDays(t.startDate, dStr) / denom));
+          actualAcc += t.progress * ratio * wFrac;
         }
       });
     }
 
-    intervals.push({
+    return {
       date: dStr,
-      label: `${curr.getMonth() + 1}/${curr.getDate()}`,
-      planned: Math.min(100, Math.round(plannedAcc)),
-      actual: isPastOrToday ? Math.min(100, Math.round(actualAcc)) : null as any,
-    });
-
-    // Step by 14 days
-    curr.setDate(curr.getDate() + 14);
-  }
-
-  return intervals;
+      label: `${parsed.getMonth() + 1}/${parsed.getDate()}`,
+      planned: Math.min(100, Math.round(plannedAcc * 10) / 10),
+      actual: isPastOrToday ? Math.min(100, Math.round(actualAcc * 10) / 10) : (null as number | null),
+    };
+  });
 }
 
 // Automatically renumber all WBS codes based on Phase order and Task sequence

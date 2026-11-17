@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Project } from '../types/project';
 import {
   calculateProjectMetrics,
@@ -29,6 +29,7 @@ export const ProgressDashboardView: React.FC<ProgressDashboardViewProps> = ({
 }) => {
   const metrics = useMemo(() => calculateProjectMetrics(project), [project]);
   const sCurveData = useMemo(() => generateSCurveData(project), [project]);
+  const [hoveredIdx, setHoveredIdx] = useState<number | null>(null);
 
   // Delayed tasks
   const delayedTasks = project.tasks.filter(
@@ -103,10 +104,32 @@ export const ProgressDashboardView: React.FC<ProgressDashboardViewProps> = ({
     .join(' ');
 
   // Build SVG path for actual line (up to today or where actual != null)
-  const actualPoints = sCurveData.filter((pt) => pt.actual !== null);
-  const actualPath = actualPoints
-    .map((pt, i) => `${i === 0 ? 'M' : 'L'} ${getX(i)} ${getY(pt.actual)}`)
+  const actualEntries = sCurveData
+    .map((pt, index) => ({ pt, index }))
+    .filter((entry): entry is { pt: typeof entry.pt & { actual: number }; index: number } => entry.pt.actual !== null);
+  const actualPath = actualEntries
+    .map(({ pt, index }, i) => `${i === 0 ? 'M' : 'L'} ${getX(index)} ${getY(pt.actual)}`)
     .join(' ');
+
+  const hoveredPoint = hoveredIdx !== null ? sCurveData[hoveredIdx] : null;
+  const hoveredLeftPct = hoveredIdx !== null ? (getX(hoveredIdx) / svgWidth) * 100 : 0;
+
+  const handleSvgMouseMove = (e: React.MouseEvent<SVGSVGElement>) => {
+    if (pointsCount === 0) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    if (rect.width <= 0) return;
+    const svgX = ((e.clientX - rect.left) / rect.width) * svgWidth;
+    let closestIdx = 0;
+    let minDist = Infinity;
+    for (let i = 0; i < pointsCount; i++) {
+      const dist = Math.abs(svgX - getX(i));
+      if (dist < minDist) {
+        minDist = dist;
+        closestIdx = i;
+      }
+    }
+    setHoveredIdx(closestIdx);
+  };
 
   return (
     <div className="space-y-6 max-w-[1600px] mx-auto p-2">
@@ -238,86 +261,168 @@ export const ProgressDashboardView: React.FC<ProgressDashboardViewProps> = ({
 
         {/* SVG Curve Container */}
         <div className="w-full overflow-x-auto">
-          <svg
-            viewBox={`0 0 ${svgWidth} ${svgHeight}`}
-            className="w-full h-auto min-w-[650px] font-mono text-3xs select-none"
-          >
-            {/* Grid Horizontal lines 0%, 25%, 50%, 75%, 100% */}
-            {[0, 25, 50, 75, 100].map((val) => {
-              const y = getY(val);
-              return (
-                <g key={val}>
-                  <line
-                    x1={padLeft}
-                    y1={y}
-                    x2={svgWidth - padRight}
-                    y2={y}
-                    stroke="#f1f5f9"
-                    strokeWidth="1"
-                  />
-                  <text
-                    x={padLeft - 8}
-                    y={y + 3}
-                    textAnchor="end"
-                    fill="#94a3b8"
-                  >
-                    {val}%
-                  </text>
-                </g>
-              );
-            })}
-
-            {/* Planned S-Curve line */}
-            <path
-              d={plannedPath}
-              fill="none"
-              stroke="#3b82f6"
-              strokeWidth="2.5"
-              strokeDasharray="6,4"
-            />
-
-            {/* Actual S-Curve line */}
-            {actualPoints.length > 0 && (
-              <path
-                d={actualPath}
-                fill="none"
-                stroke="#10b981"
-                strokeWidth="3.5"
-                strokeLinecap="round"
-              />
+          <div className="relative min-w-[650px]">
+            {/* Floating Hover Tooltip */}
+            {hoveredPoint && hoveredIdx !== null && (
+              <div
+                className="pointer-events-none absolute top-2 z-20 bg-slate-900 text-white rounded-lg shadow-lg px-3 py-2 text-xs font-mono border border-slate-700 whitespace-nowrap"
+                style={{
+                  left: `${hoveredLeftPct}%`,
+                  transform:
+                    hoveredLeftPct > 75
+                      ? 'translateX(-105%)'
+                      : hoveredLeftPct < 20
+                      ? 'translateX(6%)'
+                      : 'translateX(-50%)',
+                }}
+              >
+                <div className="text-3xs text-slate-300 font-semibold border-b border-slate-700 pb-1 mb-1 flex items-center justify-between gap-3">
+                  <span>{hoveredPoint.date}</span>
+                  {hoveredPoint.date === TODAY_STR && (
+                    <span className="text-amber-300">今日基準日</span>
+                  )}
+                </div>
+                <div className="space-y-0.5">
+                  <div className="flex items-center justify-between gap-4">
+                    <span className="text-blue-300">預定進度：</span>
+                    <span className="font-bold text-white">{hoveredPoint.planned}%</span>
+                  </div>
+                  <div className="flex items-center justify-between gap-4">
+                    <span className="text-emerald-300">實際進度：</span>
+                    <span className="font-bold text-white">
+                      {hoveredPoint.actual !== null ? `${hoveredPoint.actual}%` : '尚未到達'}
+                    </span>
+                  </div>
+                  {hoveredPoint.actual !== null && (
+                    <div className="flex items-center justify-between gap-4 pt-0.5 border-t border-slate-700/80">
+                      <span className="text-slate-300">進度偏差：</span>
+                      <span
+                        className={`font-bold ${
+                          hoveredPoint.actual - hoveredPoint.planned >= 0
+                            ? 'text-emerald-400'
+                            : 'text-red-400'
+                        }`}
+                      >
+                        {hoveredPoint.actual - hoveredPoint.planned >= 0
+                          ? `+${Math.round((hoveredPoint.actual - hoveredPoint.planned) * 10) / 10}%`
+                          : `${Math.round((hoveredPoint.actual - hoveredPoint.planned) * 10) / 10}%`}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </div>
             )}
 
-            {/* Actual dots */}
-            {actualPoints.map((pt, i) => (
-              <circle
-                key={i}
-                cx={getX(i)}
-                cy={getY(pt.actual)}
-                r="3.5"
-                fill="#10b981"
-                stroke="#ffffff"
-                strokeWidth="1.5"
-              />
-            ))}
-
-            {/* X-axis labels (dates) */}
-            {sCurveData.map((pt, i) => {
-              if (i % Math.ceil(pointsCount / 8) === 0 || i === pointsCount - 1) {
+            <svg
+              viewBox={`0 0 ${svgWidth} ${svgHeight}`}
+              onMouseMove={handleSvgMouseMove}
+              onMouseLeave={() => setHoveredIdx(null)}
+              className="w-full h-auto font-mono text-3xs select-none cursor-crosshair"
+            >
+              {/* Grid Horizontal lines 0%, 25%, 50%, 75%, 100% */}
+              {[0, 25, 50, 75, 100].map((val) => {
+                const y = getY(val);
                 return (
-                  <text
-                    key={pt.date}
-                    x={getX(i)}
-                    y={svgHeight - 12}
-                    textAnchor="middle"
-                    fill="#64748b"
-                  >
-                    {pt.label}
-                  </text>
+                  <g key={val}>
+                    <line
+                      x1={padLeft}
+                      y1={y}
+                      x2={svgWidth - padRight}
+                      y2={y}
+                      stroke="#f1f5f9"
+                      strokeWidth="1"
+                    />
+                    <text
+                      x={padLeft - 8}
+                      y={y + 3}
+                      textAnchor="end"
+                      fill="#94a3b8"
+                    >
+                      {val}%
+                    </text>
+                  </g>
                 );
-              }
-              return null;
-            })}
-          </svg>
+              })}
+
+              {/* Hover vertical crosshair line */}
+              {hoveredIdx !== null && (
+                <line
+                  x1={getX(hoveredIdx)}
+                  y1={padTop}
+                  x2={getX(hoveredIdx)}
+                  y2={svgHeight - padBottom}
+                  stroke="#94a3b8"
+                  strokeWidth="1.5"
+                  strokeDasharray="4,3"
+                />
+              )}
+
+              {/* Planned S-Curve line */}
+              <path
+                d={plannedPath}
+                fill="none"
+                stroke="#3b82f6"
+                strokeWidth="2.5"
+                strokeDasharray="6,4"
+              />
+
+              {/* Subtle Planned Dots */}
+              {sCurveData.map((pt, i) => (
+                <circle
+                  key={`p-${pt.date}`}
+                  cx={getX(i)}
+                  cy={getY(pt.planned)}
+                  r={hoveredIdx === i ? 5 : 2.5}
+                  fill="#3b82f6"
+                  stroke="#ffffff"
+                  strokeWidth={hoveredIdx === i ? 2 : 1}
+                />
+              ))}
+
+              {/* Actual S-Curve line */}
+              {actualEntries.length > 0 && (
+                <path
+                  d={actualPath}
+                  fill="none"
+                  stroke="#10b981"
+                  strokeWidth="3.5"
+                  strokeLinecap="round"
+                />
+              )}
+
+              {/* Actual dots */}
+              {actualEntries.map(({ pt, index }) => (
+                <circle
+                  key={`a-${pt.date}`}
+                  cx={getX(index)}
+                  cy={getY(pt.actual)}
+                  r={hoveredIdx === index ? 5.5 : 3.5}
+                  fill="#10b981"
+                  stroke="#ffffff"
+                  strokeWidth={hoveredIdx === index ? 2 : 1.5}
+                />
+              ))}
+
+              {/* X-axis labels (dates) */}
+              {sCurveData.map((pt, i) => {
+                if (i % Math.ceil(pointsCount / 8) === 0 || i === pointsCount - 1) {
+                  return (
+                    <text
+                      key={pt.date}
+                      x={getX(i)}
+                      y={svgHeight - 12}
+                      textAnchor="middle"
+                      fill={hoveredIdx === i ? '#0f172a' : '#64748b'}
+                      fontWeight={hoveredIdx === i ? 700 : 400}
+                    >
+                      {pt.label}
+                    </text>
+                  );
+                }
+                return null;
+              })}
+            </svg>
+          </div>
         </div>
       </div>
 

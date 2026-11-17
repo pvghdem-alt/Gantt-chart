@@ -171,6 +171,7 @@ export const GanttTutorialView: React.FC<GanttTutorialViewProps> = ({ onNavigate
   // Ch5 interactive S-curve simulator state
   const [simDay, setSimDay] = useState<number>(16);
   const [simScenario, setSimScenario] = useState<'ontrack' | 'delayed' | 'ahead'>('delayed');
+  const [hoveredSimDay, setHoveredSimDay] = useState<number | null>(null);
 
   // Ch6 quiz state
   const [quizAnswers, setQuizAnswers] = useState<Record<string, number>>({});
@@ -1181,8 +1182,52 @@ export const GanttTutorialView: React.FC<GanttTutorialViewProps> = ({ onNavigate
                 </div>
               </div>
 
-              <div className="bg-white border border-slate-200 rounded-lg p-4">
-                <svg viewBox="0 0 560 220" className="w-full h-52 overflow-visible">
+              <div className="bg-white border border-slate-200 rounded-lg p-4 relative">
+                {hoveredSimDay !== null && (
+                  <div
+                    className="pointer-events-none absolute top-2 z-20 bg-slate-900 text-white rounded-lg shadow-lg px-3 py-2 text-xs font-mono border border-slate-700 whitespace-nowrap"
+                    style={{
+                      left: `${((44 + (hoveredSimDay / 30) * 496) / 560) * 100}%`,
+                      transform:
+                        hoveredSimDay > 21
+                          ? 'translateX(-105%)'
+                          : hoveredSimDay < 6
+                          ? 'translateX(6%)'
+                          : 'translateX(-50%)',
+                    }}
+                  >
+                    <div className="text-3xs text-slate-300 font-semibold border-b border-slate-700 pb-1 mb-1">
+                      第 {hoveredSimDay} 天
+                    </div>
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="text-slate-300">預定進度：</span>
+                      <span className="font-bold text-white">
+                        {interpolateCurve(hoveredSimDay, 'planned')}%
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="text-blue-300">實際進度：</span>
+                      <span className="font-bold text-white">
+                        {hoveredSimDay <= simDay
+                          ? `${interpolateCurve(hoveredSimDay, 'actual')}%`
+                          : '尚未到達'}
+                      </span>
+                    </div>
+                  </div>
+                )}
+
+                <svg
+                  viewBox="0 0 560 220"
+                  className="w-full h-52 overflow-visible cursor-crosshair select-none"
+                  onMouseMove={(e) => {
+                    const rect = e.currentTarget.getBoundingClientRect();
+                    if (rect.width <= 0) return;
+                    const svgX = ((e.clientX - rect.left) / rect.width) * 560;
+                    const day = Math.round(((svgX - 44) / 496) * 30);
+                    setHoveredSimDay(Math.max(0, Math.min(30, day)));
+                  }}
+                  onMouseLeave={() => setHoveredSimDay(null)}
+                >
                   {/* Horizontal Grid */}
                   {[0, 25, 50, 75, 100].map((pct) => {
                     const y = 190 - (pct / 100) * 160;
@@ -1207,6 +1252,19 @@ export const GanttTutorialView: React.FC<GanttTutorialViewProps> = ({ onNavigate
                       </g>
                     );
                   })}
+
+                  {/* Hover Crosshair */}
+                  {hoveredSimDay !== null && (
+                    <line
+                      x1={44 + (hoveredSimDay / 30) * 496}
+                      y1="20"
+                      x2={44 + (hoveredSimDay / 30) * 496}
+                      y2="190"
+                      stroke="#94a3b8"
+                      strokeWidth="1.25"
+                      strokeDasharray="3 3"
+                    />
+                  )}
 
                   {/* Planned Curve (Dashed) */}
                   <polyline
@@ -1263,6 +1321,30 @@ export const GanttTutorialView: React.FC<GanttTutorialViewProps> = ({ onNavigate
                     r="5"
                     fill="#2563eb"
                   />
+
+                  {/* Hovered Highlight Dots */}
+                  {hoveredSimDay !== null && (
+                    <>
+                      <circle
+                        cx={44 + (hoveredSimDay / 30) * 496}
+                        cy={190 - (interpolateCurve(hoveredSimDay, 'planned') / 100) * 160}
+                        r="4.5"
+                        fill="#475569"
+                        stroke="#ffffff"
+                        strokeWidth="1.5"
+                      />
+                      {hoveredSimDay <= simDay && (
+                        <circle
+                          cx={44 + (hoveredSimDay / 30) * 496}
+                          cy={190 - (interpolateCurve(hoveredSimDay, 'actual') / 100) * 160}
+                          r="5"
+                          fill="#2563eb"
+                          stroke="#ffffff"
+                          strokeWidth="1.5"
+                        />
+                      )}
+                    </>
+                  )}
 
                   {/* X-Axis Labels */}
                   {sCurvePoints.map((p) => (
