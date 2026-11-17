@@ -29,7 +29,16 @@ import {
   deleteProjectDoc,
   seedInitialProjects,
 } from './services/projectService';
-import { testConnection } from './lib/firebase';
+import {
+  ALLOWED_USER_EMAIL,
+  auth,
+  isAllowedEmail,
+  logoutUser,
+  onAuthStateChanged,
+  testConnection,
+  User,
+} from './lib/firebase';
+import { LoginGate } from './components/LoginGate';
 import {
   Building2,
   Calendar,
@@ -128,16 +137,53 @@ export default function App() {
   const [isCreateProjectModalOpen, setIsCreateProjectModalOpen] = useState(false);
   const [isCloudSynced, setIsCloudSynced] = useState<boolean>(false);
 
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [authLoading, setAuthLoading] = useState<boolean>(true);
+  const [authError, setAuthError] = useState<string | null>(null);
+  const [, setAuthRefreshTick] = useState(0);
+
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Firestore Real-time Subscription and Auto-Seed
+  // Firebase Auth listener — strictly enforce jason2134@gmail.com
   useEffect(() => {
+    const unsubAuth = onAuthStateChanged(auth, async (user) => {
+      if (user && !isAllowedEmail(user.email)) {
+        const attempted = user.email || '未知帳號';
+        await logoutUser();
+        setCurrentUser(null);
+        setAuthError(
+          `存取被拒絕：此系統僅授權 ${ALLOWED_USER_EMAIL} 登入使用（目前嘗試帳號：${attempted}）。`
+        );
+        setAuthLoading(false);
+        return;
+      }
+
+      setCurrentUser(user);
+      setAuthLoading(false);
+    });
+
+    return () => unsubAuth();
+  }, []);
+
+  const isAuthorizedAndVerified = Boolean(
+    currentUser && isAllowedEmail(currentUser.email) && currentUser.emailVerified
+  );
+
+  // Firestore Real-time Subscription and Auto-Seed (ONLY after authorized & verified login)
+  useEffect(() => {
+    if (!isAuthorizedAndVerified) {
+      setIsCloudSynced(false);
+      return;
+    }
+
     testConnection().then((connected) => {
       if (connected) setIsCloudSynced(true);
     });
 
     // Seed initial projects if Firestore is completely empty
-    seedInitialProjects(INITIAL_PROJECTS);
+    seedInitialProjects(INITIAL_PROJECTS).catch((err) => {
+      console.warn('Initial seed check warning:', err);
+    });
 
     const unsubscribe = subscribeProjects(
       (remoteProjects) => {
@@ -173,7 +219,7 @@ export default function App() {
     return () => {
       if (unsubscribe) unsubscribe();
     };
-  }, []);
+  }, [isAuthorizedAndVerified]);
 
   // Active Project instance
   const activeProject =
@@ -598,6 +644,41 @@ export default function App() {
     window.print();
   };
 
+  const handleVerifiedRefresh = async () => {
+    if (!auth.currentUser) return;
+    await auth.currentUser.reload();
+    await auth.currentUser.getIdToken(true);
+    setCurrentUser(auth.currentUser);
+    setAuthRefreshTick((t) => t + 1);
+    if (!auth.currentUser.emailVerified) {
+      setAuthError('系統尚未偵測到您的信箱驗證完成，請確認已點擊信中驗證連結。');
+    } else {
+      setAuthError(null);
+    }
+  };
+
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-slate-100 flex items-center justify-center text-slate-600 text-xs font-medium">
+        <div className="bg-white border border-slate-200 rounded-xl px-6 py-4 shadow-sm flex items-center gap-3">
+          <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+          <span>正在確認登入授權狀態...</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isAuthorizedAndVerified) {
+    return (
+      <LoginGate
+        currentUser={currentUser}
+        externalError={authError}
+        onClearExternalError={() => setAuthError(null)}
+        onVerifiedRefresh={handleVerifiedRefresh}
+      />
+    );
+  }
+
   return (
     <div className="min-h-screen bg-slate-100 flex flex-col text-slate-800">
       {/* Hidden File Input for JSON Import */}
@@ -624,6 +705,8 @@ export default function App() {
         onPrint={handlePrint}
         isCloudSynced={isCloudSynced}
         onRestoreUserData={handleRestoreUserProject}
+        userEmail={currentUser?.email}
+        onLogout={() => logoutUser()}
       />
 
       {/* 2. Sub-Header Active Project Banner (Hidden on Portfolio View) */}

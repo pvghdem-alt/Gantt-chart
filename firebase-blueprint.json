@@ -5,20 +5,77 @@
       "description": "工程進度專案，包含分項工程、工項排程與重大管制節點",
       "type": "object",
       "properties": {
-        "id": { "type": "string", "description": "專案識別碼" },
-        "name": { "type": "string", "maxLength": 200, "description": "工程專案名稱" },
-        "code": { "type": "string", "maxLength": 50, "description": "工程標案編號" },
-        "client": { "type": "string", "maxLength": 100, "description": "業主 / 委託單位" },
-        "contractor": { "type": "string", "maxLength": 100, "description": "承造總包廠商" },
-        "projectManager": { "type": "string", "maxLength": 100, "description": "工地專任技師 / 經理" },
-        "startDate": { "type": "string", "description": "開工日期 (YYYY-MM-DD)" },
-        "targetEndDate": { "type": "string", "description": "預定竣工日期 (YYYY-MM-DD)" },
-        "totalBudget": { "type": "number", "description": "合約造價 (萬元)" },
-        "description": { "type": "string", "maxLength": 2000, "description": "工程說明" },
-        "status": { "type": "string", "enum": ["planning", "in_progress", "delayed", "completed"] },
-        "phases": { "type": "array", "description": "分項工程列表" },
-        "tasks": { "type": "array", "description": "工項作業與管制節點列表" },
-        "updatedAt": { "type": "string", "description": "最後更新時間戳記" }
+        "id": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "description": "專案識別碼"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200,
+          "description": "工程專案名稱"
+        },
+        "code": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 60,
+          "description": "工程標案編號"
+        },
+        "client": {
+          "type": "string",
+          "maxLength": 200,
+          "description": "業主 / 委託單位"
+        },
+        "contractor": {
+          "type": "string",
+          "maxLength": 200,
+          "description": "承造總包廠商"
+        },
+        "projectManager": {
+          "type": "string",
+          "maxLength": 200,
+          "description": "工地專任技師 / 經理"
+        },
+        "startDate": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 30,
+          "description": "開工日期 (YYYY-MM-DD)"
+        },
+        "targetEndDate": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 30,
+          "description": "預定竣工日期 (YYYY-MM-DD)"
+        },
+        "totalBudget": {
+          "type": "number",
+          "description": "合約造價 (萬元)"
+        },
+        "description": {
+          "type": "string",
+          "maxLength": 2000,
+          "description": "工程說明"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["planning", "in_progress", "delayed", "completed"]
+        },
+        "phases": {
+          "type": "array",
+          "description": "分項工程列表 (上限 50 項)"
+        },
+        "tasks": {
+          "type": "array",
+          "description": "工項作業與管制節點列表 (上限 500 項)"
+        },
+        "updatedAt": {
+          "type": "string",
+          "maxLength": 50,
+          "description": "最後更新時間戳記"
+        }
       },
       "required": ["id", "name", "code", "startDate", "targetEndDate", "phases", "tasks"]
     }
@@ -26,7 +83,7 @@
   "firestore": {
     "/projects/{projectId}": {
       "schema": "Project",
-      "description": "工程專案文件集合，儲存專案資訊、分項工程與工項甘特排程資料"
+      "description": "工程專案文件集合，僅限授權帳號 jason2134@gmail.com 存取"
     }
   }
 }

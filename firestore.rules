@@ -8,8 +8,22 @@ service cloud.firestore {
     }
 
     // Helper functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    // Strictly allow only jason2134@gmail.com with verified email
+    function isAuthorizedUser() {
+      return isSignedIn() &&
+             request.auth.token.email == 'jason2134@gmail.com' &&
+             request.auth.token.email_verified == true;
+    }
+
     function isValidId(id) {
-      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+      return id is string &&
+             id.size() > 0 &&
+             id.size() <= 128 &&
+             id.matches('^[a-zA-Z0-9_\\-]+$');
     }
 
     function incoming() {
@@ -21,34 +35,56 @@ service cloud.firestore {
     }
 
     function isValidProject(data) {
-      return data.id is string && data.id.size() <= 128 &&
+      return data.keys().hasAll(['id', 'name', 'code', 'startDate', 'targetEndDate', 'phases', 'tasks']) &&
+             data.keys().hasOnly([
+               'id', 'name', 'code', 'client', 'contractor', 'projectManager',
+               'startDate', 'targetEndDate', 'totalBudget', 'description',
+               'status', 'phases', 'tasks', 'updatedAt'
+             ]) &&
+             isValidId(data.id) &&
              data.name is string && data.name.size() > 0 && data.name.size() <= 200 &&
              data.code is string && data.code.size() > 0 && data.code.size() <= 60 &&
-             data.startDate is string && data.startDate.size() <= 30 &&
-             data.targetEndDate is string && data.targetEndDate.size() <= 30 &&
-             data.phases is list && data.phases.size() <= 50 &&
-             data.tasks is list && data.tasks.size() <= 500;
+             data.startDate is string && data.startDate.size() > 0 && data.startDate.size() <= 30 &&
+             data.targetEndDate is string && data.targetEndDate.size() > 0 && data.targetEndDate.size() <= 30 &&
+             (!('client' in data) || (data.client is string && data.client.size() <= 200)) &&
+             (!('contractor' in data) || (data.contractor is string && data.contractor.size() <= 200)) &&
+             (!('projectManager' in data) || (data.projectManager is string && data.projectManager.size() <= 200)) &&
+             (!('totalBudget' in data) || (data.totalBudget is number && data.totalBudget >= 0)) &&
+             (!('description' in data) || (data.description is string && data.description.size() <= 2000)) &&
+             (!('status' in data) || (data.status in ['planning', 'in_progress', 'delayed', 'completed'])) &&
+             (!('updatedAt' in data) || (data.updatedAt is string && data.updatedAt.size() <= 50)) &&
+             data.phases is list && data.phases.size() >= 0 && data.phases.size() <= 50 &&
+             (data.phases.size() == 0 || data.phases[0] is map) &&
+             data.tasks is list && data.tasks.size() >= 0 && data.tasks.size() <= 500 &&
+             (data.tasks.size() == 0 || data.tasks[0] is map);
     }
 
-    // Connection test doc (used by testConnection in SDK setup)
+    // Connection check document used by startup testConnection()
     match /test/connection {
-      allow read: if true;
+      allow get: if true;
     }
 
-    // Engineering Projects collection
+    // Engineering Projects collection — strictly restricted to jason2134@gmail.com
     match /projects/{projectId} {
-      // Allow reading projects for collaborative schedule monitoring
-      allow get: if isValidId(projectId);
-      allow list: if true;
+      allow get: if isAuthorizedUser() && isValidId(projectId);
+      allow list: if isAuthorizedUser();
 
-      // Allow creating project with validated schema
-      allow create: if isValidId(projectId) && isValidProject(incoming());
+      allow create: if isAuthorizedUser() &&
+                       isValidId(projectId) &&
+                       isValidProject(incoming()) &&
+                       incoming().id == projectId;
 
-      // Allow updating project with validated schema
-      allow update: if isValidId(projectId) && isValidProject(incoming());
+      allow update: if isAuthorizedUser() &&
+                       isValidId(projectId) &&
+                       isValidProject(incoming()) &&
+                       incoming().id == existing().id &&
+                       incoming().diff(existing()).affectedKeys().hasOnly([
+                         'name', 'code', 'client', 'contractor', 'projectManager',
+                         'startDate', 'targetEndDate', 'totalBudget', 'description',
+                         'status', 'phases', 'tasks', 'updatedAt'
+                       ]);
 
-      // Allow deleting project
-      allow delete: if isValidId(projectId);
+      allow delete: if isAuthorizedUser() && isValidId(projectId);
     }
   }
 }

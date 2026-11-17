@@ -13,6 +13,7 @@ import {
   ChevronDown,
   FolderKanban,
   Check,
+  LogOut,
 } from 'lucide-react';
 
 interface HeaderProps {
@@ -29,6 +30,8 @@ interface HeaderProps {
   onPrint: () => void;
   isCloudSynced?: boolean;
   onRestoreUserData?: () => void;
+  userEmail?: string | null;
+  onLogout?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -45,6 +48,8 @@ export const Header: React.FC<HeaderProps> = ({
   onPrint,
   isCloudSynced = true,
   onRestoreUserData,
+  userEmail,
+  onLogout,
 }) => {
   const [isProjectDropdownOpen, setIsProjectDropdownOpen] = useState(false);
 
@@ -275,6 +280,25 @@ export const Header: React.FC<HeaderProps> = ({
             <Plus className="w-3.5 h-3.5" />
             <span>新增工項</span>
           </button>
+
+          {userEmail && onLogout && (
+            <div className="flex items-center gap-1.5 pl-2 border-l border-slate-200">
+              <span
+                title={`已授權登入帳號: ${userEmail}`}
+                className="hidden xl:inline-block text-3xs font-mono text-slate-600 bg-slate-100 px-2 py-1 rounded border border-slate-200 max-w-[150px] truncate"
+              >
+                {userEmail}
+              </span>
+              <button
+                onClick={onLogout}
+                title="登出系統"
+                className="flex items-center gap-1 px-2 py-1.5 text-2xs font-medium text-slate-600 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors border border-slate-200 whitespace-nowrap"
+              >
+                <LogOut className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">登出</span>
+              </button>
+            </div>
+          )}
         </div>
       </div>
     </header>
