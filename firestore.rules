@@ -39,7 +39,7 @@ service cloud.firestore {
              data.keys().hasOnly([
                'id', 'name', 'code', 'client', 'contractor', 'projectManager',
                'startDate', 'targetEndDate', 'totalBudget', 'description',
-               'status', 'phases', 'tasks', 'updatedAt'
+               'status', 'phases', 'tasks', 'workforceLogs', 'updatedAt'
              ]) &&
              isValidId(data.id) &&
              data.name is string && data.name.size() > 0 && data.name.size() <= 200 &&
@@ -56,7 +56,12 @@ service cloud.firestore {
              data.phases is list && data.phases.size() >= 0 && data.phases.size() <= 50 &&
              (data.phases.size() == 0 || data.phases[0] is map) &&
              data.tasks is list && data.tasks.size() >= 0 && data.tasks.size() <= 500 &&
-             (data.tasks.size() == 0 || data.tasks[0] is map);
+             (data.tasks.size() == 0 || data.tasks[0] is map) &&
+             (!('workforceLogs' in data) || (
+               data.workforceLogs is list &&
+               data.workforceLogs.size() <= 730 &&
+               (data.workforceLogs.size() == 0 || data.workforceLogs[0] is map)
+             ));
     }
 
     // Connection check document used by startup testConnection()
@@ -81,7 +86,7 @@ service cloud.firestore {
                        incoming().diff(existing()).affectedKeys().hasOnly([
                          'name', 'code', 'client', 'contractor', 'projectManager',
                          'startDate', 'targetEndDate', 'totalBudget', 'description',
-                         'status', 'phases', 'tasks', 'updatedAt'
+                         'status', 'phases', 'tasks', 'workforceLogs', 'updatedAt'
                        ]);
 
       allow delete: if isAuthorizedUser() && isValidId(projectId);

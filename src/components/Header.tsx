@@ -14,6 +14,8 @@ import {
   FolderKanban,
   Check,
   LogOut,
+  Users,
+  BookOpen,
 } from 'lucide-react';
 
 interface HeaderProps {
@@ -162,11 +164,11 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
         </div>
 
-        {/* Zone 2: 5 clean single-line nav links */}
-        <nav className="flex items-center gap-1 p-1 bg-slate-100 rounded-lg text-xs font-medium text-slate-600">
+        {/* Zone 2: clean single-line nav links */}
+        <nav className="flex items-center gap-1 p-1 bg-slate-100 rounded-lg text-xs font-medium text-slate-600 overflow-x-auto">
           <button
             onClick={() => onViewChange('portfolio')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md transition-all whitespace-nowrap shrink-0 ${
+            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md transition-all whitespace-nowrap shrink-0 ${
               activeView === 'portfolio'
                 ? 'bg-white text-slate-900 shadow-2xs font-semibold'
                 : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
@@ -178,7 +180,7 @@ export const Header: React.FC<HeaderProps> = ({
 
           <button
             onClick={() => onViewChange('gantt')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md transition-all whitespace-nowrap shrink-0 ${
+            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md transition-all whitespace-nowrap shrink-0 ${
               activeView === 'gantt'
                 ? 'bg-white text-slate-900 shadow-2xs font-semibold'
                 : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
@@ -190,7 +192,7 @@ export const Header: React.FC<HeaderProps> = ({
 
           <button
             onClick={() => onViewChange('milestones')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md transition-all whitespace-nowrap shrink-0 ${
+            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md transition-all whitespace-nowrap shrink-0 ${
               activeView === 'milestones'
                 ? 'bg-white text-slate-900 shadow-2xs font-semibold'
                 : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
@@ -202,7 +204,7 @@ export const Header: React.FC<HeaderProps> = ({
 
           <button
             onClick={() => onViewChange('table')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md transition-all whitespace-nowrap shrink-0 ${
+            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md transition-all whitespace-nowrap shrink-0 ${
               activeView === 'table'
                 ? 'bg-white text-slate-900 shadow-2xs font-semibold'
                 : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
@@ -214,7 +216,7 @@ export const Header: React.FC<HeaderProps> = ({
 
           <button
             onClick={() => onViewChange('analytics')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md transition-all whitespace-nowrap shrink-0 ${
+            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md transition-all whitespace-nowrap shrink-0 ${
               activeView === 'analytics'
                 ? 'bg-white text-slate-900 shadow-2xs font-semibold'
                 : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
@@ -222,6 +224,30 @@ export const Header: React.FC<HeaderProps> = ({
           >
             <BarChart3 className="w-3.5 h-3.5 text-emerald-600" />
             <span>進度與S曲線</span>
+          </button>
+
+          <button
+            onClick={() => onViewChange('workforce')}
+            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md transition-all whitespace-nowrap shrink-0 ${
+              activeView === 'workforce'
+                ? 'bg-white text-slate-900 shadow-2xs font-semibold'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
+            }`}
+          >
+            <Users className="w-3.5 h-3.5 text-indigo-600" />
+            <span>每日出工統計</span>
+          </button>
+
+          <button
+            onClick={() => onViewChange('tutorial')}
+            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md transition-all whitespace-nowrap shrink-0 ${
+              activeView === 'tutorial'
+                ? 'bg-white text-slate-900 shadow-2xs font-semibold'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
+            }`}
+          >
+            <BookOpen className="w-3.5 h-3.5 text-sky-600" />
+            <span>甘特圖教學</span>
           </button>
         </nav>
 

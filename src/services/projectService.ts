@@ -47,6 +47,7 @@ function sanitizeProjectForFirestore(project: Project): Record<string, unknown> 
     status: safeStatus,
     phases: stripUndefined((project.phases || []).slice(0, 50)),
     tasks: stripUndefined((project.tasks || []).slice(0, 500)),
+    workforceLogs: stripUndefined((project.workforceLogs || []).slice(0, 730)),
     updatedAt: new Date().toISOString().slice(0, 50),
   };
 

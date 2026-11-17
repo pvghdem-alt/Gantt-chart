@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Project, Task, ActiveView, Phase } from './types/project';
+import { Project, Task, ActiveView, Phase, DailyWorkforceLog } from './types/project';
 import { INITIAL_PROJECTS, BUILDING_CONSTRUCTION_PROJECT } from './data/presetProjects';
 import { Header } from './components/Header';
 import { GanttChart } from './components/GanttChart';
@@ -12,6 +12,8 @@ import { MilestoneControlView } from './components/MilestoneControlView';
 import { TaskTableView } from './components/TaskTableView';
 import { ProgressDashboardView } from './components/ProgressDashboardView';
 import { PortfolioOverviewView } from './components/PortfolioOverviewView';
+import { WorkforceStatsView } from './components/WorkforceStatsView';
+import { GanttTutorialView } from './components/GanttTutorialView';
 import { TaskEditModal } from './components/TaskEditModal';
 import { ProjectSettingsModal } from './components/ProjectSettingsModal';
 import { CreateProjectModal } from './components/CreateProjectModal';
@@ -22,6 +24,7 @@ import {
   diffDays,
   autoScheduleDependentTasks,
   renumberProjectWBS,
+  recalculateWeightsByBudget,
 } from './utils/dateUtils';
 import {
   subscribeProjects,
@@ -349,32 +352,40 @@ export default function App() {
     setIsTaskModalOpen(true);
   };
 
-  const handleSaveTask = async (savedTask: Task) => {
-    let updatedProject: Project | null = null;
+  const handleSaveTask = async (
+    savedTask: Task,
+    options?: { autoWeightByBudget?: boolean }
+  ) => {
+    const targetProject = projects.find((p) => p.id === activeProjectId);
+    if (!targetProject) return;
+
+    const exists = targetProject.tasks.some((t) => t.id === savedTask.id);
+    const intermediate = exists
+      ? targetProject.tasks.map((t) => (t.id === savedTask.id ? savedTask : t))
+      : [...targetProject.tasks, savedTask];
+
+    // Automatically cascade forward-pass schedule for all dependent tasks
+    const { updatedTasks: scheduledTasks } = autoScheduleDependentTasks(intermediate);
+
+    // Optionally recalculate all task weights proportionally by budgetCost
+    const finalTasks = options?.autoWeightByBudget
+      ? recalculateWeightsByBudget(scheduledTasks).updatedTasks
+      : scheduledTasks;
+
+    const updatedProject: Project = {
+      ...targetProject,
+      tasks: finalTasks,
+      updatedAt: new Date().toISOString(),
+    };
+
     setProjects((prev) =>
-      prev.map((proj) => {
-        if (proj.id !== activeProjectId) return proj;
-        const exists = proj.tasks.some((t) => t.id === savedTask.id);
-        const intermediate = exists
-          ? proj.tasks.map((t) => (t.id === savedTask.id ? savedTask : t))
-          : [...proj.tasks, savedTask];
-        // Automatically cascade forward-pass schedule for all dependent tasks
-        const { updatedTasks } = autoScheduleDependentTasks(intermediate);
-        updatedProject = {
-          ...proj,
-          tasks: updatedTasks,
-          updatedAt: new Date().toISOString(),
-        };
-        return updatedProject;
-      })
+      prev.map((proj) => (proj.id === activeProjectId ? updatedProject : proj))
     );
 
-    if (updatedProject) {
-      try {
-        await saveProject(updatedProject);
-      } catch (e) {
-        console.error('Failed to save task to Firestore:', e);
-      }
+    try {
+      await saveProject(updatedProject);
+    } catch (e) {
+      console.error('Failed to save task to Firestore:', e);
     }
   };
 
@@ -589,6 +600,109 @@ export default function App() {
     handleUpdateProgress(taskId, newProgress);
   };
 
+  const handleUpdateWorkforceLogs = async (newLogs: DailyWorkforceLog[]) => {
+    const targetProject = projects.find((p) => p.id === activeProjectId);
+    if (!targetProject) return;
+
+    const updatedProject: Project = {
+      ...targetProject,
+      workforceLogs: newLogs,
+      updatedAt: new Date().toISOString(),
+    };
+
+    setProjects((prev) =>
+      prev.map((proj) => (proj.id === activeProjectId ? updatedProject : proj))
+    );
+
+    try {
+      await saveProject(updatedProject);
+    } catch (e) {
+      console.error('Failed to update workforce logs in Firestore:', e);
+    }
+  };
+
+  const handleUpdateTaskBudget = async (
+    taskId: string,
+    budgetCost: number,
+    autoRecalcWeights: boolean
+  ) => {
+    const targetProject = projects.find((p) => p.id === activeProjectId);
+    if (!targetProject) return;
+
+    const nextCost = Math.max(0, Number(budgetCost) || 0);
+    const withUpdatedCost = targetProject.tasks.map((t) =>
+      t.id === taskId ? { ...t, budgetCost: nextCost } : t
+    );
+
+    const finalTasks = autoRecalcWeights
+      ? recalculateWeightsByBudget(withUpdatedCost).updatedTasks
+      : withUpdatedCost;
+
+    const updatedProject: Project = {
+      ...targetProject,
+      tasks: finalTasks,
+      updatedAt: new Date().toISOString(),
+    };
+
+    setProjects((prev) =>
+      prev.map((proj) => (proj.id === activeProjectId ? updatedProject : proj))
+    );
+
+    try {
+      await saveProject(updatedProject);
+    } catch (e) {
+      console.error('Failed to update task budget in Firestore:', e);
+    }
+  };
+
+  const handleUpdateTaskWeight = async (taskId: string, weight: number) => {
+    const targetProject = projects.find((p) => p.id === activeProjectId);
+    if (!targetProject) return;
+
+    const nextWeight = Math.max(0, Math.min(100, Math.round((Number(weight) || 0) * 10) / 10));
+    const updatedProject: Project = {
+      ...targetProject,
+      tasks: targetProject.tasks.map((t) =>
+        t.id === taskId ? { ...t, weight: nextWeight } : t
+      ),
+      updatedAt: new Date().toISOString(),
+    };
+
+    setProjects((prev) =>
+      prev.map((proj) => (proj.id === activeProjectId ? updatedProject : proj))
+    );
+
+    try {
+      await saveProject(updatedProject);
+    } catch (e) {
+      console.error('Failed to update task weight in Firestore:', e);
+    }
+  };
+
+  const handleRecalculateWeightsByBudget = async () => {
+    const targetProject = projects.find((p) => p.id === activeProjectId);
+    if (!targetProject) return;
+
+    const { updatedTasks, totalBudget } = recalculateWeightsByBudget(targetProject.tasks);
+    if (totalBudget <= 0) return;
+
+    const updatedProject: Project = {
+      ...targetProject,
+      tasks: updatedTasks,
+      updatedAt: new Date().toISOString(),
+    };
+
+    setProjects((prev) =>
+      prev.map((proj) => (proj.id === activeProjectId ? updatedProject : proj))
+    );
+
+    try {
+      await saveProject(updatedProject);
+    } catch (e) {
+      console.error('Failed to recalculate task weights in Firestore:', e);
+    }
+  };
+
   // Export JSON (All projects or active project)
   const handleExportJson = () => {
     const dataStr =
@@ -709,8 +823,8 @@ export default function App() {
         onLogout={() => logoutUser()}
       />
 
-      {/* 2. Sub-Header Active Project Banner (Hidden on Portfolio View) */}
-      {activeView !== 'portfolio' && (
+      {/* 2. Sub-Header Active Project Banner (Hidden on Portfolio & Tutorial Views) */}
+      {activeView !== 'portfolio' && activeView !== 'tutorial' && (
         <div className="bg-white border-b border-slate-200 px-6 py-3 no-print">
           <div className="max-w-[1720px] mx-auto flex flex-wrap items-center justify-between gap-4">
             {/* Project Title & Meta details */}
@@ -854,6 +968,9 @@ export default function App() {
             onReorderTasks={handleReorderTasks}
             onUpdatePhases={handleUpdatePhases}
             onDeletePhase={handleDeletePhase}
+            onUpdateTaskBudget={handleUpdateTaskBudget}
+            onUpdateTaskWeight={handleUpdateTaskWeight}
+            onRecalculateWeightsByBudget={handleRecalculateWeightsByBudget}
           />
         )}
 
@@ -863,6 +980,19 @@ export default function App() {
             project={activeProject}
             onSelectView={setActiveView}
           />
+        )}
+
+        {/* Daily Workforce / Crew Attendance Statistics & Auto-Charts */}
+        {activeView === 'workforce' && (
+          <WorkforceStatsView
+            project={activeProject}
+            onUpdateWorkforceLogs={handleUpdateWorkforceLogs}
+          />
+        )}
+
+        {/* Beginner-Friendly Comprehensive Gantt Chart Tutorial */}
+        {activeView === 'tutorial' && (
+          <GanttTutorialView onNavigateView={setActiveView} />
         )}
       </main>
 

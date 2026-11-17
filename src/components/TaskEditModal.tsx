@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { Project, Task, MilestoneType } from '../types/project';
 import { calculateDuration, addDays, TODAY_STR } from '../utils/dateUtils';
-import { X, Flag, Calendar, Link2, Check, AlertCircle } from 'lucide-react';
+import { X, Flag, Calendar, Link2, Check, Calculator } from 'lucide-react';
 
 interface TaskEditModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (task: Task) => void;
+  onSave: (task: Task, options?: { autoWeightByBudget?: boolean }) => void;
   project: Project;
   initialTask?: Task | null;
   defaultPhaseId?: string;
@@ -41,7 +41,12 @@ export const TaskEditModal: React.FC<TaskEditModalProps> = ({
     notes: '',
   });
 
+  const [autoSyncWeightOnBudget, setAutoSyncWeightOnBudget] = useState<boolean>(true);
+  const [recalcAllOnSave, setRecalcAllOnSave] = useState<boolean>(false);
+
   useEffect(() => {
+    setAutoSyncWeightOnBudget(true);
+    setRecalcAllOnSave(false);
     if (initialTask) {
       setFormData({ ...initialTask });
     } else {
@@ -73,6 +78,20 @@ export const TaskEditModal: React.FC<TaskEditModalProps> = ({
       });
     }
   }, [initialTask, defaultPhaseId, isOpen, project]);
+
+  // Sum of budgetCost from all other tasks in the project
+  const otherTasksBudget = React.useMemo(() => {
+    return project.tasks
+      .filter((t) => !initialTask || t.id !== initialTask.id)
+      .reduce((sum, t) => sum + Math.max(0, Number(t.budgetCost) || 0), 0);
+  }, [project.tasks, initialTask]);
+
+  const currentTaskBudget = Math.max(0, Number(formData.budgetCost) || 0);
+  const projectedTotalBudget = otherTasksBudget + currentTaskBudget;
+  const calculatedSharePct =
+    projectedTotalBudget > 0
+      ? Math.round(((currentTaskBudget / projectedTotalBudget) * 100) * 10) / 10
+      : 0;
 
   // Other tasks available as predecessors (excluding self)
   const candidatePredecessors = project.tasks.filter(
@@ -216,8 +235,48 @@ export const TaskEditModal: React.FC<TaskEditModalProps> = ({
       completedDate: formData.progress === 100 ? (formData.completedDate || TODAY_STR) : undefined,
     };
 
-    onSave(task);
+    onSave(task, { autoWeightByBudget: recalcAllOnSave });
     onClose();
+  };
+
+  const handleBudgetChange = (rawVal: string) => {
+    const cost = Math.max(0, Number(rawVal) || 0);
+    const nextTotal = otherTasksBudget + cost;
+    const nextShare =
+      nextTotal > 0 ? Math.round(((cost / nextTotal) * 100) * 10) / 10 : 0;
+
+    if (autoSyncWeightOnBudget && nextTotal > 0) {
+      setFormData((prev) => ({
+        ...prev,
+        budgetCost: cost,
+        weight: nextShare,
+      }));
+      setRecalcAllOnSave(true);
+    } else {
+      setFormData((prev) => ({
+        ...prev,
+        budgetCost: cost,
+      }));
+    }
+  };
+
+  const handleManualWeightChange = (rawVal: string) => {
+    const w = Math.max(0, Math.min(100, Number(rawVal) || 0));
+    setFormData((prev) => ({
+      ...prev,
+      weight: w,
+    }));
+    // Respect manual weight adjustment instead of overwriting on save
+    setRecalcAllOnSave(false);
+  };
+
+  const handleApplyShareNow = () => {
+    if (projectedTotalBudget <= 0) return;
+    setFormData((prev) => ({
+      ...prev,
+      weight: calculatedSharePct,
+    }));
+    setRecalcAllOnSave(true);
   };
 
   return (
@@ -346,41 +405,109 @@ export const TaskEditModal: React.FC<TaskEditModalProps> = ({
             </div>
           </div>
 
-          {/* Row 4: Progress & Weight */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <div className="flex items-center justify-between mb-1">
-                <label className="text-slate-700 font-semibold">
-                  目前實際進度 %
-                </label>
-                <span className="font-mono font-bold text-blue-600">
-                  {formData.progress}%
-                </span>
+          {/* Row 4: Progress */}
+          <div>
+            <div className="flex items-center justify-between mb-1">
+              <label className="text-slate-700 font-semibold">
+                目前實際進度 %
+              </label>
+              <span className="font-mono font-bold text-blue-600">
+                {formData.progress}%
+              </span>
+            </div>
+            <input
+              type="range"
+              min="0"
+              max="100"
+              step="5"
+              value={formData.progress}
+              onChange={(e) => setFormData({ ...formData, progress: Number(e.target.value) })}
+              className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
+            />
+          </div>
+
+          {/* Row 4b: Budget & Weight Calculation */}
+          <div className="p-3.5 rounded-xl border border-blue-200/80 bg-blue-50/30 space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center gap-1.5 font-bold text-slate-800">
+                <Calculator className="w-4 h-4 text-blue-600" />
+                <span>預算金額與權重設定（支援手動調整或依金額佔比自動計算）</span>
               </div>
-              <input
-                type="range"
-                min="0"
-                max="100"
-                step="5"
-                value={formData.progress}
-                onChange={(e) => setFormData({ ...formData, progress: Number(e.target.value) })}
-                className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
-              />
+              <label className="flex items-center gap-1.5 text-slate-700 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={autoSyncWeightOnBudget}
+                  onChange={(e) => setAutoSyncWeightOnBudget(e.target.checked)}
+                  className="w-3.5 h-3.5 rounded text-blue-600 focus:ring-blue-500"
+                />
+                <span>輸入預算時自動依佔比帶入權重</span>
+              </label>
             </div>
 
-            <div>
-              <label className="block text-slate-700 font-semibold mb-1">
-                全案權重 %
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-slate-700 font-semibold mb-1">
+                  工項預算金額 (萬元)
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  step="any"
+                  value={formData.budgetCost}
+                  onChange={(e) => handleBudgetChange(e.target.value)}
+                  placeholder="0"
+                  className="w-full px-3 py-2 border border-slate-200 rounded-lg bg-white focus:outline-hidden focus:ring-2 focus:ring-blue-500 font-mono text-slate-900"
+                />
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-slate-700 font-semibold">
+                    全案權重 %
+                  </label>
+                  {projectedTotalBudget > 0 && (
+                    <button
+                      type="button"
+                      onClick={handleApplyShareNow}
+                      className="text-3xs font-semibold text-blue-600 hover:text-blue-800 hover:underline"
+                    >
+                      套用金額佔比 ({calculatedSharePct}%)
+                    </button>
+                  )}
+                </div>
+                <input
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="0.1"
+                  value={formData.weight}
+                  onChange={(e) => handleManualWeightChange(e.target.value)}
+                  placeholder="例如: 8"
+                  className="w-full px-3 py-2 border border-slate-200 rounded-lg bg-white focus:outline-hidden focus:ring-2 focus:ring-blue-500 font-mono text-slate-900"
+                />
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-blue-200/50 text-3xs text-slate-600">
+              <div className="font-mono">
+                佔比試算：分子{' '}
+                <span className="font-bold text-slate-900">{currentTaskBudget.toLocaleString()}</span>
+                {' ÷ '}
+                全案總預算{' '}
+                <span className="font-bold text-slate-900">{projectedTotalBudget.toLocaleString()}</span> 萬元
+                {' = '}
+                <span className="font-bold text-blue-700">{calculatedSharePct}%</span>
+              </div>
+
+              <label className="flex items-center gap-1.5 text-slate-700 cursor-pointer select-none font-sans">
+                <input
+                  type="checkbox"
+                  checked={recalcAllOnSave}
+                  onChange={(e) => setRecalcAllOnSave(e.target.checked)}
+                  className="w-3.5 h-3.5 rounded text-blue-600 focus:ring-blue-500"
+                />
+                <span>儲存時同步依金額重算全案所有工項權重（總和 100%）</span>
               </label>
-              <input
-                type="number"
-                min="0"
-                max="100"
-                value={formData.weight}
-                onChange={(e) => setFormData({ ...formData, weight: Number(e.target.value) })}
-                placeholder="例如: 8"
-                className="w-full px-3 py-2 border border-slate-200 rounded-lg bg-white focus:outline-hidden focus:ring-2 focus:ring-blue-500 font-mono"
-              />
             </div>
           </div>
 
@@ -504,8 +631,8 @@ export const TaskEditModal: React.FC<TaskEditModalProps> = ({
             </div>
           </div>
 
-          {/* Row 7: Contractor, Location & Budget */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          {/* Row 7: Contractor & Location */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="block text-slate-700 font-semibold mb-1">
                 責任廠商 / 工班
@@ -529,19 +656,6 @@ export const TaskEditModal: React.FC<TaskEditModalProps> = ({
                 onChange={(e) => setFormData({ ...formData, location: e.target.value })}
                 placeholder="例如: B3F 筏基底板"
                 className="w-full px-3 py-1.5 border border-slate-200 rounded-lg bg-white focus:outline-hidden focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-
-            <div>
-              <label className="block text-slate-700 font-semibold mb-1">
-                預算金額 (萬元)
-              </label>
-              <input
-                type="number"
-                value={formData.budgetCost}
-                onChange={(e) => setFormData({ ...formData, budgetCost: Number(e.target.value) })}
-                placeholder="0"
-                className="w-full px-3 py-1.5 border border-slate-200 rounded-lg bg-white focus:outline-hidden focus:ring-2 focus:ring-blue-500 font-mono"
               />
             </div>
           </div>

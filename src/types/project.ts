@@ -41,6 +41,23 @@ export interface Phase {
   order: number;
 }
 
+export interface CrewCountEntry {
+  trade: string;       // 工班 / 工種名稱
+  workers: number;     // 當日進場人數
+  taskId?: string;     // 對應工項 ID (選填)
+  notes?: string;      // 施工區位 / 作業備註
+}
+
+export interface DailyWorkforceLog {
+  id: string;          // e.g., wf-2026-11-16
+  date: string;        // YYYY-MM-DD
+  weather?: '晴' | '陰' | '雨' | '其他';
+  entries: CrewCountEntry[];
+  totalWorkers: number;
+  safetyNotes?: string;
+  updatedAt: string;
+}
+
 export type ProjectStatus = 'planning' | 'in_progress' | 'delayed' | 'completed';
 
 export interface Project {
@@ -56,11 +73,11 @@ export interface Project {
   description: string;
   phases: Phase[];
   tasks: Task[];
+  workforceLogs?: DailyWorkforceLog[];
   status?: ProjectStatus;
   updatedAt: string;
 }
 
 export type TimelineZoom = 'day' | 'week' | 'month';
 
-export type ActiveView = 'portfolio' | 'gantt' | 'milestones' | 'table' | 'analytics';
-
+export type ActiveView = 'portfolio' | 'gantt' | 'milestones' | 'table' | 'analytics' | 'workforce' | 'tutorial';

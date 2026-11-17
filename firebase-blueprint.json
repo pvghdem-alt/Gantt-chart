@@ -71,6 +71,10 @@
           "type": "array",
           "description": "工項作業與管制節點列表 (上限 500 項)"
         },
+        "workforceLogs": {
+          "type": "array",
+          "description": "每日進場工班出工統計紀錄列表 (上限 730 筆)"
+        },
         "updatedAt": {
           "type": "string",
           "maxLength": 50,

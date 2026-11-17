@@ -504,4 +504,46 @@ export function autoScheduleDependentTasks(tasks: Task[]): {
   return { updatedTasks, adjustedCount };
 }
 
+// Automatically calculate each task's weight (%) proportionally from its budgetCost over total tasks budget
+export function recalculateWeightsByBudget(tasks: Task[]): {
+  updatedTasks: Task[];
+  totalBudget: number;
+} {
+  const costs = tasks.map((t) => Math.max(0, Number(t.budgetCost) || 0));
+  const totalBudget = costs.reduce((sum, c) => sum + c, 0);
+
+  if (totalBudget <= 0) {
+    return { updatedTasks: tasks, totalBudget: 0 };
+  }
+
+  const weights = costs.map((cost) => {
+    if (cost <= 0) return 0;
+    return Math.round(((cost / totalBudget) * 100) * 10) / 10;
+  });
+
+  // Adjust rounding discrepancy on the largest-budget task so total equals 100.0%
+  const sumWeights = Math.round(weights.reduce((acc, w) => acc + w, 0) * 10) / 10;
+  const diff = Math.round((100 - sumWeights) * 10) / 10;
+
+  if (diff !== 0) {
+    let maxIdx = -1;
+    let maxCost = -1;
+    costs.forEach((c, idx) => {
+      if (c > maxCost) {
+        maxCost = c;
+        maxIdx = idx;
+      }
+    });
+    if (maxIdx >= 0) {
+      weights[maxIdx] = Math.max(0, Math.round((weights[maxIdx] + diff) * 10) / 10);
+    }
+  }
+
+  const updatedTasks = tasks.map((t, idx) => ({
+    ...t,
+    weight: weights[idx],
+  }));
+
+  return { updatedTasks, totalBudget };
+}
 
